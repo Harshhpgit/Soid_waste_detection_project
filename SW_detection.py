@@ -6,7 +6,7 @@ model = YOLO('yolov8m.pt')  # 's' for small; you can use 'm' or 'n' too
 # Train the model
 model.train(
     data="data.yaml",  # <-- Change this to the full path of your file
-    epochs=50,
+    epochs=25,
     imgsz=640,
     batch=16,
     project='waste_detection',
