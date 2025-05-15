@@ -7,4 +7,5 @@ Note : all the required models and dataset are uploaded on RELEASES taged on the
 Here is also direct link https://github.com/Harshhpgit/Soid_waste_detection_project/releases/tag/v.o.o1
 
 my_model.keras is model trained using code binary_clasification.py and using dataset archive.zip.
+
 best.pt is trained using code SW_detection.py and using dataset waste.detection.v1i.yolov8.zip.
