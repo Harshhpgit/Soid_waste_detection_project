@@ -4,11 +4,11 @@ from PIL import Image
 import numpy as np
 
 # Load YOLOv8 detection model
-detector = YOLO(r"E:\project XYZ\best.pt")  # Trained YOLOv8 model for detecting "waste" objects
+detector = YOLO(r"best.pt")  # Trained YOLOv8 model for detecting "waste" objects
 
 # Load classifier model (from your existing ResNet code)
 from tensorflow.keras.models import load_model
-classifier = load_model("E:\project XYZ\my_model.keras")  # Save your trained model from earlier
+classifier = load_model("my_model.keras")  # Save your trained model from earlier
 
 # Class labels (match your classifier)
 class_labels = ["organic", "non-organic"]  # Adjust based on your dataset
