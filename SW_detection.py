@@ -5,7 +5,7 @@ model = YOLO('yolov8m.pt')  # 's' for small; you can use 'm' or 'n' too
 
 # Train the model
 model.train(
-    data="E:\project XYZ\DATASET 2\data.yaml",  # <-- Change this to the full path of your file
+    data="data.yaml",  # <-- Change this to the full path of your file
     epochs=50,
     imgsz=640,
     batch=16,
