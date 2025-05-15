@@ -1,52 +1,110 @@
-from ultralytics import YOLO
-import cv2
-from PIL import Image
+import pandas as pd
 import numpy as np
-from tensorflow.keras.models import load_model
+import matplotlib.pyplot as plt
+import skimage.io
+import tensorflow as tf
 
-# Load YOLOv8 detection model
-detector = YOLO("best.pt")  # Trained YOLOv8 model for detecting "waste" objects
+import os
+import random
+from PIL import Image
 
-# Load classifier model (from your existing ResNet code)
-classifier = load_model("my_model.keras")  # Save your trained model from earlier
+from tqdm import tqdm
 
-# Class labels (match your classifier)
-class_labels = ["organic", "non-organic"]  # Modified to reflect the two main categories
+from skimage.io import imread, imshow
+from skimage.transform import resize
 
-# Open webcam
-cap = cv2.VideoCapture(0)
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
-    # Run YOLOv8 object detection
-    results = detector(frame)
-    for r in results:
-        for box in r.boxes:
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            conf = float(box.conf[0])
-            cls_id = int(box.cls[0])
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications.vgg16 import VGG16
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import (Input, Dense, Flatten, BatchNormalization,
+                                     Dropout, Activation)
+from tensorflow.keras.callbacks import EarlyStopping
+import warnings
+warnings.filterwarnings("ignore")
 
-            # Crop the detected object
-            crop = frame[y1:y2, x1:x2]
-            if crop.size == 0:
-                continue
+# Data Generators
+train_datagen = ImageDataGenerator(
+    rescale=1.0 / 255.0,
+    zoom_range=0.4,
+    rotation_range=10,
+    horizontal_flip=True,
+    vertical_flip=True,
+    validation_split=0.2
+)
 
-            # Resize and preprocess for classifier
-            img = Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)).resize((224, 224))
-            img_array = np.expand_dims(np.array(img) / 255.0, axis=0)
+valid_datagen = ImageDataGenerator(
+    rescale=1.0 / 255.0,
+    validation_split=0.2
+)
 
-            # Predict class
-            pred = classifier.predict(img_array)[0][0]
-            label = class_labels[0] if pred < 0.5 else class_labels[1]
+test_datagen = ImageDataGenerator(rescale=1.0 / 255.0)
 
-            # Draw bounding box and label
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, f"{label} ({conf:.2f})", (x1, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+# Data Loaders
+train_dataset = train_datagen.flow_from_directory(
+    directory=r'/content/dataset/DATASET/TRAIN',
+    target_size=(224, 224),
+    class_mode='binary',
+    batch_size=128,
+    subset='training'
+)
 
-    cv2.imshow("Waste Detection & Classification", frame)
-    if cv2.waitKey(1) & 0xFF == ord("q"):
-        break
-cap.release()
-cv2.destroyAllWindows()
+valid_dataset = valid_datagen.flow_from_directory(
+    directory=r'/content/dataset/DATASET/TRAIN',
+    target_size=(224, 224),
+    class_mode='binary',
+    batch_size=128,
+    subset='validation'
+)
+
+# Load base model
+base_model = VGG16(input_shape=(224, 224, 3),
+                   include_top=False,
+                   weights='imagenet')
+
+# Freeze base model layers
+for layer in base_model.layers:
+    layer.trainable = False
+
+# Functional API model
+inputs = Input(shape=(224, 224, 3))
+x = base_model(inputs, training=False)
+x = Dropout(0.2)(x)
+x = Flatten()(x)
+x = BatchNormalization()(x)
+x = Dense(512, kernel_initializer='he_uniform')(x)
+x = BatchNormalization()(x)
+x = Activation('relu')(x)
+x = Dropout(0.2)(x)
+x = Dense(512, kernel_initializer='he_uniform')(x)
+x = BatchNormalization()(x)
+x = Activation('relu')(x)
+x = Dropout(0.2)(x)
+outputs = Dense(1, activation='sigmoid')(x)
+
+model = Model(inputs, outputs)
+
+# Compile the model
+adam = tf.keras.optimizers.Adam(learning_rate=0.001)
+model.compile(
+    loss='binary_crossentropy',
+    metrics=['accuracy'],
+    optimizer=adam
+)
+
+# Print summary
+model.summary()
+
+# Callbacks
+earlystopping = EarlyStopping(monitor='val_accuracy', mode='max', patience=2, verbose=1)
+
+# Train the model
+history = model.fit(
+    train_dataset,
+    validation_data=valid_dataset,
+    epochs=5,
+    callbacks=[earlystopping],
+    verbose=1
+)
+
+# Save model
+model.save('my_model.keras')
